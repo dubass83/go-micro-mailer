@@ -1,8 +1,12 @@
 package api
 
 import (
+	"bytes"
 	"fmt"
+	"html/template"
 
+	"github.com/dubass83/go-micro-mailer/util"
+	"github.com/vanng822/go-premailer/premailer"
 	"github.com/wneessen/go-mail"
 )
 
@@ -28,15 +32,15 @@ type MailTrapSender struct {
 	mailTrapSMTPAuth mail.SMTPAuthType
 }
 
-func NewMailtrapSender(name, email, login, pass, smtpHost string, smtpPort int, smtpAuth mail.SMTPAuthType) EmailSender {
+func NewMailtrapSender(name, email, login, pass string) EmailSender {
 	return &MailTrapSender{
 		name:             name,
 		fromEmailAdress:  email,
 		mailtrapLogin:    login,
 		mailtrapPassword: pass,
-		mailTrapSMTPHost: smtpHost,
-		mailTrapSMTPPort: smtpPort,
-		mailTrapSMTPAuth: smtpAuth,
+		mailTrapSMTPHost: "sandbox.smtp.mailtrap.io",
+		mailTrapSMTPPort: 2525,
+		mailTrapSMTPAuth: mail.SMTPAuthPlain,
 	}
 }
 
@@ -82,4 +86,44 @@ func (sender *MailTrapSender) SendEmail(
 	}
 
 	return c.DialAndSend(m)
+}
+
+func buildHTMLMessage(conf util.Config, message map[string]any) (string, error) {
+	templateToRender := fmt.Sprintf("%s/%s", conf.TemplateDir, conf.TemplateHTML)
+
+	t, err := template.New("email-html").ParseFiles(templateToRender)
+	if err != nil {
+		return "", fmt.Errorf("failed to create template from %s: %s", templateToRender, err)
+	}
+
+	var tpl bytes.Buffer
+
+	if err := t.ExecuteTemplate(&tpl, "body", message); err != nil {
+		return "", fmt.Errorf("failed execute template with message %v: %s", message, err)
+	}
+
+	formattedMessage, err := inlineCSS(tpl.String())
+	if err != nil {
+		return "", fmt.Errorf("failed generate inline CSS message from template: %s", err)
+	}
+	return formattedMessage, nil
+}
+
+func inlineCSS(fm string) (string, error) {
+	options := premailer.Options{
+		RemoveClasses:     false,
+		CssToAttributes:   false,
+		KeepBangImportant: true,
+	}
+
+	prem, err := premailer.NewPremailerFromString(fm, &options)
+	if err != nil {
+		return "", fmt.Errorf("failed create premailer from string %s: %s", fm, err)
+	}
+
+	html, err := prem.Transform()
+	if err != nil {
+		return "", fmt.Errorf("failed transform premailer to string: %s", err)
+	}
+	return html, nil
 }
