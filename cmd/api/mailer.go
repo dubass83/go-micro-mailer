@@ -13,8 +13,7 @@ import (
 type EmailSender interface {
 	SendEmail(
 		subject string,
-		content string,
-		contentType mail.ContentType,
+		message map[string]any,
 		to []string,
 		cc []string,
 		bcc []string,
@@ -30,24 +29,34 @@ type MailTrapSender struct {
 	mailTrapSMTPHost string
 	mailTrapSMTPPort int
 	mailTrapSMTPAuth mail.SMTPAuthType
+	templateDir      string
+	templateHTML     string
+	templatePlain    string
 }
 
-func NewMailtrapSender(name, email, login, pass string) EmailSender {
-	return &MailTrapSender{
-		name:             name,
-		fromEmailAdress:  email,
-		mailtrapLogin:    login,
-		mailtrapPassword: pass,
-		mailTrapSMTPHost: "sandbox.smtp.mailtrap.io",
-		mailTrapSMTPPort: 2525,
-		mailTrapSMTPAuth: mail.SMTPAuthPlain,
+func NewMailSender(conf util.Config) (EmailSender, error) {
+	switch conf.EmailService {
+	case "mailtrap":
+		return &MailTrapSender{
+			name:             conf.SenderName,
+			fromEmailAdress:  conf.SenderEmail,
+			mailtrapLogin:    conf.EmailLogin,
+			mailtrapPassword: conf.EmailPassword,
+			mailTrapSMTPHost: "sandbox.smtp.mailtrap.io",
+			mailTrapSMTPPort: 2525,
+			mailTrapSMTPAuth: mail.SMTPAuthPlain,
+			templateDir:      conf.TemplateDir,
+			templateHTML:     conf.TemplateHTML,
+			templatePlain:    conf.TemplatePlain,
+		}, nil
+	default:
+		return nil, fmt.Errorf("not implemented any other mail service except mailtrap")
 	}
 }
 
 func (sender *MailTrapSender) SendEmail(
 	subject string,
-	content string,
-	contentType mail.ContentType,
+	message map[string]any,
 	to []string,
 	cc []string,
 	bcc []string,
@@ -67,8 +76,20 @@ func (sender *MailTrapSender) SendEmail(
 		return fmt.Errorf("failed to set BCC address: %s", err)
 	}
 	m.Subject(subject)
-	// mail.TypeTextHTML
-	m.SetBodyString(contentType, content)
+	// generate and set to the message text plain body
+	templPlain := fmt.Sprintf("%s/%s", sender.templateDir, sender.templateHTML)
+	contentPlain, err := builPlainTextMessage(templPlain, message)
+	if err != nil {
+		return fmt.Errorf("failed to generate plain text message: %s", err)
+	}
+	m.SetBodyString(mail.TypeTextPlain, contentPlain)
+	// generate and set to the message alternative html formated body
+	templFormated := fmt.Sprintf("%s/%s", sender.templateDir, sender.templatePlain)
+	contentHtml, err := buildHTMLMessage(templFormated, message)
+	if err != nil {
+		return fmt.Errorf("failed to generate html formated message: %s", err)
+	}
+	m.AddAlternativeString(mail.TypeTextHTML, contentHtml)
 
 	for _, file := range attachFiles {
 		m.AttachFile(file)
@@ -88,12 +109,10 @@ func (sender *MailTrapSender) SendEmail(
 	return c.DialAndSend(m)
 }
 
-func buildHTMLMessage(conf util.Config, message map[string]any) (string, error) {
-	templateToRender := fmt.Sprintf("%s/%s", conf.TemplateDir, conf.TemplateHTML)
-
-	t, err := template.New("email-html").ParseFiles(templateToRender)
+func buildHTMLMessage(templ string, message map[string]any) (string, error) {
+	t, err := template.New("email-html").ParseFiles(templ)
 	if err != nil {
-		return "", fmt.Errorf("failed to create template from %s: %s", templateToRender, err)
+		return "", fmt.Errorf("failed to create template from %s: %s", templ, err)
 	}
 
 	var tpl bytes.Buffer
@@ -126,4 +145,20 @@ func inlineCSS(fm string) (string, error) {
 		return "", fmt.Errorf("failed transform premailer to string: %s", err)
 	}
 	return html, nil
+}
+
+func builPlainTextMessage(templ string, message map[string]any) (string, error) {
+	t, err := template.New("email-plain").ParseFiles(templ)
+
+	if err != nil {
+		return "", fmt.Errorf("failed to create template from %s: %s", templ, err)
+	}
+
+	var tpl bytes.Buffer
+
+	if err := t.ExecuteTemplate(&tpl, "body", message); err != nil {
+		return "", fmt.Errorf("failed execute template with message %v: %s", message, err)
+	}
+
+	return tpl.String(), nil
 }

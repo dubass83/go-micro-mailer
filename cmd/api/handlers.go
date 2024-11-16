@@ -40,6 +40,10 @@ func (s *Server) Mailer(w http.ResponseWriter, r *http.Request) {
 	_ = writeJSON(w, http.StatusAccepted, payload)
 }
 
+func (s *Server) SendMail(w http.ResponseWriter, r *http.Request) {
+
+}
+
 func writeLog(w http.ResponseWriter, logs LogEntry, logService string) {
 	log.Debug().Msg("post log into logger service")
 	jsonData, _ := json.MarshalIndent(logs, "", "\t")
