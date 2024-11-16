@@ -14,6 +14,11 @@ type Config struct {
 	TemplateDir   string `mapstructure:"TEMPLATE_DIR"`
 	TemplateHTML  string `mapstructure:"TEMPLATE_HTML"`
 	TemplatePlain string `mapstructure:"TEMPLATE_PLAIN"`
+	EmailService  string `mapstructure:"EMAIL_SERVICE"`
+	EmailLogin    string `mapstructure:"EMAIL_LOGIN"`
+	EmailPassword string `mapstructure:"EMAIL_PASSWORD"`
+	SenderName    string `mapstructure:"SENDER_NAME"`
+	SenderEmail   string `mapstructure:"SENDER_EMAIL"`
 }
 
 // LoadConfig read configuration from file conf.env or enviroment variables
