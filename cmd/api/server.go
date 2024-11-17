@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/dubass83/go-micro-broker/util"
+	"github.com/dubass83/go-micro-mailer/util"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"

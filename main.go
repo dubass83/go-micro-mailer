@@ -4,11 +4,10 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/dubass83/go-micro-mailer/cmd/api"
+	"github.com/dubass83/go-micro-mailer/util"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-
-	"github.com/dubass83/go-micro-broker/cmd/api"
-	"github.com/dubass83/go-micro-broker/util"
 )
 
 func main() {

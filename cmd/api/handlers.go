@@ -27,6 +27,12 @@ type LogEntry struct {
 	Data string `json:"data"`
 }
 
+type MailMessage struct {
+	To      string `json:"to"`
+	Subject string `json:"subject"`
+	Message string `json:"message"`
+}
+
 // Mailer api test handler
 func (s *Server) Mailer(w http.ResponseWriter, r *http.Request) {
 	payload := jsonResponse{
@@ -41,7 +47,40 @@ func (s *Server) Mailer(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) SendMail(w http.ResponseWriter, r *http.Request) {
+	var msg MailMessage
+	err := readJSON(w, r, &msg)
+	if err != nil {
+		errorJSON(w, err)
+		return
+	}
 
+	sender, err := NewMailSender(s.Conf)
+	if err != nil {
+		errorJSON(w, err)
+		return
+	}
+
+	err = sender.SendEmail(
+		msg.Subject,
+		map[string]any{
+			"message": msg.Message,
+		},
+		[]string{msg.To},
+		[]string{},
+		[]string{},
+		[]string{},
+	)
+	if err != nil {
+		errorJSON(w, err)
+		return
+	}
+
+	payload := &jsonResponse{
+		Error:   false,
+		Massage: fmt.Sprintf("an email message was successfully sent to: %s", msg.To),
+	}
+
+	writeJSON(w, http.StatusAccepted, payload)
 }
 
 func writeLog(w http.ResponseWriter, logs LogEntry, logService string) {
